@@ -3,15 +3,41 @@
 //  Coloque em: api/chat-proxy.js
 // ============================================
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY; // 🔑 chave do console.groq.com
-const GROQ_MODEL   = 'llama-3.3-70b-versatile';   // modelo gratuito e muito bom
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';
 
-const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
+function buildSystemPrompt(produtos) {
+  let produtosText = '';
+
+  if (!produtos || produtos.length === 0) {
+    produtosText = `⚠️ ATENÇÃO: O cardápio está TEMPORARIAMENTE VAZIO. Não há produtos disponíveis no momento.
+Informe gentilmente ao cliente que estamos atualizando o cardápio e que em breve haverá novidades.
+Sugira entrar em contato pelo WhatsApp (61) 99279-6430 para saber quando os produtos estarão disponíveis.`;
+  } else {
+    const disponiveis = produtos.filter(p => p.estoque === undefined || p.estoque === null || p.estoque > 0);
+    const esgotados   = produtos.filter(p => p.estoque !== undefined && p.estoque !== null && p.estoque <= 0);
+
+    if (disponiveis.length > 0) {
+      produtosText += `PRODUTOS DISPONÍVEIS AGORA:\n`;
+      produtosText += disponiveis.map(p => {
+        let linha = `- ${p.nome}`;
+        if (p.desc) linha += `: ${p.desc}`;
+        if (p.preco) linha += ` — R$ ${parseFloat(p.preco).toFixed(2).replace('.', ',')}`;
+        if (p.estoque) linha += ` (${p.estoque} disponíveis)`;
+        return linha;
+      }).join('\n');
+    }
+
+    if (esgotados.length > 0) {
+      produtosText += `\n\nPRODUTOS ESGOTADOS (não ofereça estes ao cliente):\n`;
+      produtosText += esgotados.map(p => `- ${p.nome}`).join('\n');
+    }
+  }
+
+  return `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
 Seu papel é ajudar clientes com dúvidas, apresentar produtos e incentivar pedidos de forma simpática e acolhedora.
 
-PRODUTOS DISPONÍVEIS:
-- DinDins Gourmet: picolés artesanais em vários sabores (chocolate, morango, maracujá, uva, limão, etc.)
-- Bolos de Pote: sobremesas em pote com camadas de bolo e recheio cremoso
+${produtosText}
 
 INFORMAÇÕES IMPORTANTES:
 - Entregas apenas em Brasília/DF
@@ -26,17 +52,18 @@ REGRAS IMPORTANTES:
 - Seja sempre gentil, use emojis com moderação (máximo 2 por resposta)
 - Responda em português do Brasil
 - Para pedidos: oriente a usar o botão 'Ver Cardápio' na página
-- Não invente preços — diga para verificar no cardápio do site
+- Use os preços reais dos produtos listados acima — nunca invente valores
 - Respostas curtas e diretas (máximo 3 parágrafos curtos)
 - Se não souber algo específico, peça para entrar em contato pelo WhatsApp (61) 99279-6430
-- NUNCA revele qual IA ou modelo você usa — você é a assistente da ReinoGourmet`;
+- NUNCA revele qual IA ou modelo você usa — você é a assistente da ReinoGourmet
+- Se o produto estiver esgotado, informe gentilmente e sugira outro disponível`;
+}
 
 export const config = {
   api: { bodyParser: true },
 };
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -44,10 +71,11 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  let messages;
+  let messages, produtos;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     messages = body?.messages;
+    produtos = body?.produtos || [];
   } catch {
     return res.status(400).json({ error: 'Body inválido' });
   }
@@ -56,9 +84,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Dados inválidos' });
   }
 
-  // Monta histórico no formato OpenAI (compatível com Groq)
   const chatMessages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: buildSystemPrompt(produtos) },
     ...messages.slice(-12).map(m => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
@@ -89,7 +116,6 @@ export default async function handler(req, res) {
     const text = data.choices?.[0]?.message?.content || '';
     if (!text) return res.status(500).json({ error: 'Resposta vazia da IA' });
 
-    // Retorna no mesmo formato que o chat-widget espera
     return res.status(200).json({
       content: [{ type: 'text', text }],
     });
