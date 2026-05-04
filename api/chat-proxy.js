@@ -3,7 +3,7 @@
 //  Coloque em: api/chat-proxy.js
 // ============================================
 
-const GEMINI_API_KEY = 'AIzaSyBPzWweSVimaceWKxKv-H9jUk3gBKLgPmk'; // 🔑 cole sua chave aqui
+const GEMINI_API_KEY = 'AIzaSyBPzWweSVimaceWKxKv-H9jUk3gBKLgPmk'; // 🔑 sua chave do Google AI Studio
 const GEMINI_MODEL   = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
@@ -31,6 +31,13 @@ REGRAS IMPORTANTES:
 - Se não souber algo específico, peça para entrar em contato pelo WhatsApp (61) 99279-6430
 - NUNCA diga que é uma IA do Google ou Gemini — você é a assistente da ReinoGourmet`;
 
+// ✅ ISSO É ESSENCIAL: diz à Vercel para fazer o parse do body JSON automaticamente
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,7 +47,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  const { messages } = req.body;
+  // Garante que o body foi parseado
+  let messages;
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    messages = body?.messages;
+  } catch {
+    return res.status(400).json({ error: 'Body inválido' });
+  }
+
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Dados inválidos' });
   }
@@ -77,7 +92,6 @@ export default async function handler(req, res) {
     const text = data.candidates[0]?.content?.parts?.[0]?.text || '';
     if (!text) return res.status(500).json({ error: 'Resposta vazia da IA' });
 
-    // Retorna no mesmo formato que o chat-widget.js espera
     return res.status(200).json({
       content: [{ type: 'text', text }],
     });
