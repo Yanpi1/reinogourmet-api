@@ -4,7 +4,7 @@
 // ============================================
 
 const GEMINI_API_KEY = 'AIzaSyBElfhu5Pl7Msx0GocLQv0EwbKCKViRWts'; // 🔑 cole sua chave aqui
-const GEMINI_MODEL   = 'gemini-1.5-flash';
+const GEMINI_MODEL   = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
 Seu papel é ajudar clientes com dúvidas, apresentar produtos e incentivar pedidos de forma simpática e acolhedora.
