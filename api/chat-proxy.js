@@ -3,7 +3,7 @@
 //  Coloque em: api/chat-proxy.js
 // ============================================
 
-const GROQ_API_KEY = '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'; // 🔑 chave do console.groq.com
+const GROQ_API_KEY = process.env.GROQ_API_KEY; // 🔑 chave do console.groq.com
 const GROQ_MODEL   = 'llama-3.3-70b-versatile';   // modelo gratuito e muito bom
 
 const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
