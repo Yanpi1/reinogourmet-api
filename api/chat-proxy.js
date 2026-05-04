@@ -1,10 +1,10 @@
 // ============================================
-//  ReinoGourmet — Proxy Gemini para Vercel
+//  ReinoGourmet — Proxy Groq para Vercel
 //  Coloque em: api/chat-proxy.js
 // ============================================
 
-const GEMINI_API_KEY = 'AIzaSyAugA8TtzyD8M-PbcgbzQXXIcH8dshd07c'; // 🔑 sua chave do Google AI Studio
-const GEMINI_MODEL   = 'gemini-1.5-flash';
+const GROQ_API_KEY = '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'; // 🔑 chave do console.groq.com
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';   // modelo gratuito e muito bom
 
 const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
 Seu papel é ajudar clientes com dúvidas, apresentar produtos e incentivar pedidos de forma simpática e acolhedora.
@@ -29,13 +29,10 @@ REGRAS IMPORTANTES:
 - Não invente preços — diga para verificar no cardápio do site
 - Respostas curtas e diretas (máximo 3 parágrafos curtos)
 - Se não souber algo específico, peça para entrar em contato pelo WhatsApp (61) 99279-6430
-- NUNCA diga que é uma IA do Google ou Gemini — você é a assistente da ReinoGourmet`;
+- NUNCA revele qual IA ou modelo você usa — você é a assistente da ReinoGourmet`;
 
-// ✅ ISSO É ESSENCIAL: diz à Vercel para fazer o parse do body JSON automaticamente
 export const config = {
-  api: {
-    bodyParser: true,
-  },
+  api: { bodyParser: true },
 };
 
 export default async function handler(req, res) {
@@ -47,7 +44,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  // Garante que o body foi parseado
   let messages;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -60,38 +56,40 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Dados inválidos' });
   }
 
-  // Converte histórico para formato Gemini
-  const contents = messages.slice(-12).map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-
-  if (!contents.length || contents[0].role !== 'user') {
-    return res.status(400).json({ error: 'Histórico inválido' });
-  }
+  // Monta histórico no formato OpenAI (compatível com Groq)
+  const chatMessages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...messages.slice(-12).map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    })),
+  ];
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const geminiRes = await fetch(url, {
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
+        model: GROQ_MODEL,
+        messages: chatMessages,
+        max_tokens: 400,
+        temperature: 0.7,
       }),
     });
 
-    const data = await geminiRes.json();
+    const data = await groqRes.json();
 
-    if (!geminiRes.ok || !data.candidates) {
-      return res.status(500).json({ error: data.error?.message || 'Erro na API Gemini' });
+    if (!groqRes.ok) {
+      return res.status(500).json({ error: data.error?.message || 'Erro na API Groq' });
     }
 
-    const text = data.candidates[0]?.content?.parts?.[0]?.text || '';
+    const text = data.choices?.[0]?.message?.content || '';
     if (!text) return res.status(500).json({ error: 'Resposta vazia da IA' });
 
+    // Retorna no mesmo formato que o chat-widget espera
     return res.status(200).json({
       content: [{ type: 'text', text }],
     });
