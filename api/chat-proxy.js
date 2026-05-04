@@ -3,7 +3,7 @@
 //  Coloque em: api/chat-proxy.js
 // ============================================
 
-const GEMINI_API_KEY = 'AIzaSyBPzWweSVimaceWKxKv-H9jUk3gBKLgPmk'; // 🔑 sua chave do Google AI Studio
+const GEMINI_API_KEY = 'AIzaSyAugA8TtzyD8M-PbcgbzQXXIcH8dshd07c'; // 🔑 sua chave do Google AI Studio
 const GEMINI_MODEL   = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `Você é a assistente virtual da ReinoGourmet, um projeto solidário da Igreja do Reino em Brasília, DF.
